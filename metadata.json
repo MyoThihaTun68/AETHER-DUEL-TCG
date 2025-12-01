@@ -1,0 +1,5 @@
+{
+  "name": "Gemini Cards: Aether Duel",
+  "description": "A high-fidelity turn-based card battler featuring GSAP animations, particle effects, and an AI opponent powered by Google Gemini.",
+  "requestFramePermissions": []
+}
