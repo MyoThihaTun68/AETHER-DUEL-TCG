@@ -3,6 +3,7 @@ import { Card, CardType } from '../types';
 import { CARD_TEMPLATES, MIN_DECK_SIZE, MAX_DECK_SIZE } from '../constants';
 import { CardComponent } from './CardComponent';
 import { soundManager } from '../services/soundService';
+import html2canvas from 'html2canvas';
 
 // Inline Icons to avoid external dependency issues
 const Icons = {
@@ -11,7 +12,8 @@ const Icons = {
     Minus: ({ size }: { size?: number }) => <svg xmlns="http://www.w3.org/2000/svg" width={size || 24} height={size || 24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /></svg>,
     Trash2: ({ size }: { size?: number }) => <svg xmlns="http://www.w3.org/2000/svg" width={size || 24} height={size || 24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>,
     Save: ({ size }: { size?: number }) => <svg xmlns="http://www.w3.org/2000/svg" width={size || 24} height={size || 24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></svg>,
-    X: ({ size }: { size?: number }) => <svg xmlns="http://www.w3.org/2000/svg" width={size || 24} height={size || 24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    X: ({ size }: { size?: number }) => <svg xmlns="http://www.w3.org/2000/svg" width={size || 24} height={size || 24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>,
+    Download: ({ size }: { size?: number }) => <svg xmlns="http://www.w3.org/2000/svg" width={size || 24} height={size || 24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
 };
 
 interface DeckBuilderProps {
@@ -50,6 +52,32 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ initialDeck, onSave, o
         }
         soundManager.play('victory'); // Success sound
         onSave(currentDeck);
+    };
+
+    const cardPreviewRef = React.useRef<HTMLDivElement>(null);
+
+    const handleDownloadCard = async () => {
+        if (cardPreviewRef.current && selectedCard) {
+            soundManager.play('click');
+            try {
+                const canvas = await html2canvas(cardPreviewRef.current, {
+                    backgroundColor: null,
+                    scale: 2,
+                    logging: false,
+                    useCORS: true,
+                    allowTaint: true,
+                });
+
+                const link = document.createElement('a');
+                link.download = `${selectedCard.name.replace(/\s+/g, '_')}_Card.png`;
+                link.href = canvas.toDataURL('image/png');
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } catch (error) {
+                console.error('Error generating card image:', error);
+            }
+        }
     };
 
     // Group templates by type for easier browsing
@@ -181,26 +209,38 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ initialDeck, onSave, o
 
             {/* Detail View Modal (HD) */}
             {selectedCard && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setSelectedCard(null)}>
-                    <div className="relative flex flex-col items-center" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md animate-in fade-in duration-200" onClick={() => setSelectedCard(null)}>
+                    <div className="relative flex flex-col items-center w-full h-full justify-center" onClick={e => e.stopPropagation()}>
+
+                        {/* Close Button - Fixed to top right */}
                         <button
-                            className="absolute -top-12 right-0 text-white hover:text-red-500 transition-colors p-2"
+                            className="absolute top-6 right-6 text-white/50 hover:text-white hover:bg-red-500/20 transition-all p-2 rounded-full"
                             onClick={() => setSelectedCard(null)}
                         >
-                            <Icons.X size={32} />
+                            <Icons.X size={40} />
                         </button>
 
-                        <div className="transform scale-150 origin-center shadow-2xl rounded-xl overflow-hidden ring-4 ring-yellow-500/50">
-                            <CardComponent card={selectedCard} index={0} disableInteractive={true} />
-                        </div>
+                        {/* Card Preview Container - Scaled to 80% as requested */}
+                        <div className="flex flex-col items-center justify-center -mt-10">
+                            <div ref={cardPreviewRef} className="transform scale-[0.8] origin-center shadow-2xl rounded-xl overflow-hidden ring-4 ring-yellow-500/50 transition-transform duration-300">
+                                <CardComponent card={selectedCard} index={0} disableInteractive={true} isInspection={true} />
+                            </div>
 
-                        <div className="mt-24 flex gap-4">
-                            <button
-                                onClick={() => { handleAddCard(selectedCard); }}
-                                className="bg-green-600 hover:bg-green-500 text-white px-8 py-3 rounded-lg font-bold shadow-xl flex items-center gap-2 transform hover:scale-105 transition-all"
-                            >
-                                <Icons.Plus /> Add to Deck
-                            </button>
+                            {/* Action Buttons */}
+                            <div className="flex gap-4 -mt-12 z-10">
+                                <button
+                                    onClick={() => { handleAddCard(selectedCard); }}
+                                    className="bg-green-600 hover:bg-green-500 text-white px-8 py-3 rounded-lg font-bold shadow-xl flex items-center gap-2 transform hover:scale-105 transition-all border border-green-400/30"
+                                >
+                                    <Icons.Plus /> Add to Deck
+                                </button>
+                                <button
+                                    onClick={handleDownloadCard}
+                                    className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-lg font-bold shadow-xl flex items-center gap-2 transform hover:scale-105 transition-all border border-blue-400/30"
+                                >
+                                    <Icons.Download /> Save Image
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

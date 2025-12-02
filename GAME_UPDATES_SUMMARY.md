@@ -216,3 +216,21 @@ The game is running at: **http://localhost:3002**
 **All features implemented and ready to use!** 🎉
 
 Enjoy the enhanced strategic depth! 💪🎮
+
+---
+
+### 4. **Mobile Drag & Drop Support** 📱
+**Added full touch support for mobile devices!**
+
+- **Feature:** Drag and drop cards using touch gestures on mobile/tablet.
+- **Implementation:** Added `touchstart`, `touchmove`, and `touchend` handlers to mirror mouse events.
+- **Experience:** Smooth dragging without scrolling interference during gameplay.
+
+---
+
+### 5. **Mobile Layout Optimization** 📱
+**Fixed UI overlap issues on smaller screens!**
+
+- **Feature:** Responsive HUD layout for mobile devices.
+- **Implementation:** Moved Player Stats and End Turn button to the top of the HUD on mobile to prevent overlap with the card hand.
+- **Experience:** Clean, clutter-free interface where cards are fully visible and accessible.

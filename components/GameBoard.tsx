@@ -180,13 +180,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({ customDeck, difficulty, on
 
     const resolveMageEffects = (activeBoard: (Card | null)[], opponentBoard: (Card | null)[], who: 'player' | 'enemy') => {
         // Check both mage slots (5 and 6)
-        [5, 6].forEach(mageSlot => {
+        [5, 6].forEach((mageSlot, mageIndex) => {
             const mage = activeBoard[mageSlot];
             if (mage && mage.type === CardType.MAGE && mage.mageEffect && !mage.isExhausted) {
 
                 let effectTriggered = false;
                 const mageSlotEl = document.getElementById(`slot-${who}-${mageSlot}`);
                 const mageRect = mageSlotEl?.getBoundingClientRect();
+                const baseDelay = mageIndex * 3000; // 0ms for first mage, 3000ms for second
 
                 if (mage.mageEffect === MageEffect.DAMAGE_ENEMY_TANKS) {
                     [1, 2].forEach(idx => {
@@ -197,10 +198,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({ customDeck, difficulty, on
                             const slotEl = document.getElementById(`slot-${who === 'player' ? 'enemy' : 'player'}-${idx}`);
                             const rect = slotEl?.getBoundingClientRect();
 
-                            // Trigger VFX: Fireball from Mage to Tank
-                            if (mageRect && rect && vfxRef.current) {
-                                vfxRef.current.playEffect('FIREBALL', mageRect, rect);
-                            }
+                            // Trigger VFX: Fireball from Mage to Tank (with delay)
+                            setTimeout(() => {
+                                if (mageRect && rect && vfxRef.current) {
+                                    vfxRef.current.playEffect('FIREBALL', mageRect, rect);
+                                }
+                            }, baseDelay);
 
                             // Delayed Damage
                             setTimeout(() => {
@@ -212,7 +215,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ customDeck, difficulty, on
                                 } else {
                                     soundManager.play('damage_spell');
                                 }
-                            }, 1000); // Wait for fireball
+                            }, baseDelay + 1000);
                         }
                     });
                 } else if (mage.mageEffect === MageEffect.HEAL_FRIENDLY_TANKS) {
@@ -223,10 +226,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({ customDeck, difficulty, on
                             const slotEl = document.getElementById(`slot-${who}-${idx}`);
                             const rect = slotEl?.getBoundingClientRect();
 
-                            // Trigger VFX: Heal
-                            if (mageRect && rect && vfxRef.current) {
-                                vfxRef.current.playEffect('HEAL', rect, rect); // Heal spawns on target
-                            }
+                            // Trigger VFX: Heal (with delay)
+                            setTimeout(() => {
+                                if (mageRect && rect && vfxRef.current) {
+                                    vfxRef.current.playEffect('HEAL', rect, rect);
+                                }
+                            }, baseDelay);
 
                             setTimeout(() => {
                                 if (tank.health! < tank.maxHealth!) {
@@ -236,19 +241,95 @@ export const GameBoard: React.FC<GameBoardProps> = ({ customDeck, difficulty, on
                                     spawnFloatingText("MAX HP", rect ? rect.left + rect.width / 2 : 0, rect ? rect.top : 0, 'text-green-500');
                                 }
                                 soundManager.play('heal');
-                            }, 500);
+                            }, baseDelay + 500);
+                        }
+                    });
+                } else if (mage.mageEffect === MageEffect.HEAL_ALL_FRIENDLY) {
+                    // Heal ALL friendly units (Slots 0-7)
+                    [0, 1, 2, 3, 4, 5, 6, 7].forEach(idx => {
+                        const unit = activeBoard[idx];
+                        if (unit && unit.health && unit.maxHealth) {
+                            effectTriggered = true;
+                            const slotEl = document.getElementById(`slot-${who}-${idx}`);
+                            const rect = slotEl?.getBoundingClientRect();
+
+                            // Trigger VFX: Heal (with delay)
+                            setTimeout(() => {
+                                if (mageRect && rect && vfxRef.current) {
+                                    vfxRef.current.playEffect('HEAL', rect, rect);
+                                }
+                            }, baseDelay);
+
+                            setTimeout(() => {
+                                if (unit.health! < unit.maxHealth!) {
+                                    unit.health = Math.min(unit.health! + 1, unit.maxHealth!);
+                                    spawnFloatingText("+1 HP", rect ? rect.left + rect.width / 2 : 0, rect ? rect.top : 0, 'text-green-500');
+                                } else {
+                                    spawnFloatingText("MAX HP", rect ? rect.left + rect.width / 2 : 0, rect ? rect.top : 0, 'text-green-500');
+                                }
+                                soundManager.play('heal');
+                            }, baseDelay + 500);
                         }
                     });
                 }
 
                 if (effectTriggered) {
+                    setTimeout(() => {
+                        soundManager.play('play_spell');
+                        if (mageRect) {
+                            spawnFloatingText("PASSIVE!", mageRect.left + mageRect.width / 2, mageRect.top, 'text-fuchsia-400');
+                        }
+                    }, baseDelay);
+                }
+            }
+        });
+
+        // Check for Unit Passive Abilities (e.g. Fire Tanker)
+        activeBoard.forEach((card, slotIdx) => {
+            if (card && card.unitAbility === UnitAbility.AOE_FIRE_DAMAGE_TURN && !card.isExhausted) {
+                let effectTriggered = false;
+                const sourceEl = document.getElementById(`slot-${who}-${slotIdx}`);
+                const sourceRect = sourceEl?.getBoundingClientRect();
+
+                // Target ALL enemy units (Slots 1-7)
+                [1, 2, 3, 4, 5, 6, 7].forEach(targetIdx => {
+                    const target = opponentBoard[targetIdx];
+                    if (target && target.health && target.health > 0) {
+                        effectTriggered = true;
+                        const targetEl = document.getElementById(`slot-${who === 'player' ? 'enemy' : 'player'}-${targetIdx}`);
+                        const targetRect = targetEl?.getBoundingClientRect();
+
+                        // Trigger VFX: Fireball
+                        if (sourceRect && targetRect && vfxRef.current) {
+                            vfxRef.current.playEffect('FIREBALL', sourceRect, targetRect);
+                        }
+
+                        // Delayed Damage
+                        setTimeout(() => {
+                            if (opponentBoard[targetIdx]) { // Check again in case it died
+                                opponentBoard[targetIdx]!.health! -= 1;
+                                spawnFloatingText("-1", targetRect ? targetRect.left + targetRect.width / 2 : 0, targetRect ? targetRect.top : 0, 'text-red-500');
+
+                                if (opponentBoard[targetIdx]!.health! <= 0) {
+                                    opponentBoard[targetIdx] = null;
+                                    soundManager.play('death');
+                                } else {
+                                    soundManager.play('damage_spell');
+                                }
+                            }
+                        }, 800);
+                    }
+                });
+
+                if (effectTriggered) {
                     soundManager.play('play_spell');
-                    if (mageRect) {
-                        spawnFloatingText("PASSIVE!", mageRect.left + mageRect.width / 2, mageRect.top, 'text-fuchsia-400');
+                    if (sourceRect) {
+                        spawnFloatingText("FIRE STORM!", sourceRect.left + sourceRect.width / 2, sourceRect.top, 'text-orange-500');
                     }
                 }
             }
         });
+
         return { activeBoard, opponentBoard };
     };
 
@@ -331,6 +412,64 @@ export const GameBoard: React.FC<GameBoardProps> = ({ customDeck, difficulty, on
 
     // --- Drag Logic ---
 
+    const attemptDrop = (clientX: number, clientY: number) => {
+        if (!dragState.card) return;
+
+        const card = dragState.card;
+        const source = dragState.source;
+
+        try {
+            let targetSlotIndex = -1;
+            let targetOwner: 'player' | 'enemy' | null = null;
+
+            for (let i = 0; i < MAX_BOARD_SLOTS; i++) {
+                const el = document.getElementById(`slot-player-${i}`);
+                if (el) {
+                    const rect = el.getBoundingClientRect();
+                    if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
+                        targetSlotIndex = i;
+                        targetOwner = 'player';
+                        break;
+                    }
+                }
+            }
+
+            if (targetOwner === null) {
+                for (let i = 0; i < MAX_BOARD_SLOTS; i++) {
+                    const el = document.getElementById(`slot-enemy-${i}`);
+                    if (el) {
+                        const rect = el.getBoundingClientRect();
+                        if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
+                            targetSlotIndex = i;
+                            targetOwner = 'enemy';
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (source === 'hand') {
+                const isUnitType = card.type === CardType.UNIT || card.type === CardType.SUMMONER || card.type === CardType.TOKEN || card.type === CardType.MAGE;
+
+                if (isUnitType && targetOwner === 'player' && targetSlotIndex !== -1) {
+                    handleSummonUnit('player', card, targetSlotIndex);
+                } else if (!isUnitType && targetOwner === 'enemy') {
+                    handleCastSpell('player', card, targetSlotIndex);
+                } else if (card.type === CardType.DEFENSE || card.type === CardType.SPELL_HEAL) {
+                    handleCastSpell('player', card);
+                }
+            } else if (source === 'board') {
+                if (targetOwner === 'enemy' && targetSlotIndex !== -1) {
+                    handleUnitCombat('player', dragState.slotIndex!, targetSlotIndex);
+                }
+            }
+        } catch (error) {
+            console.error("Drop Error:", error);
+        } finally {
+            setDragState({ card: null, source: 'hand', x: 0, y: 0 });
+        }
+    };
+
     const handleMouseDown = (e: React.MouseEvent, card: Card, source: 'hand' | 'board', slotIndex?: number) => {
         if (e.button === 2) return;
         try {
@@ -368,6 +507,47 @@ export const GameBoard: React.FC<GameBoardProps> = ({ customDeck, difficulty, on
         }
     };
 
+    const handleTouchStart = (e: React.TouchEvent, card: Card, source: 'hand' | 'board', slotIndex?: number) => {
+        // Prevent default to stop scrolling/zooming while interacting with game elements
+        // e.preventDefault(); 
+
+        try {
+            if (gameState.phase !== GamePhase.PLAYER_MAIN) return;
+            if (source === 'board' && slotIndex === 0) return;
+
+            if (source === 'hand') {
+                if (card.cost > gameState.player.mana) {
+                    gsap.to(`.card-hand-${card.id}`, { x: 5, duration: 0.05, yoyo: true, repeat: 3 });
+                    soundManager.play('click');
+                    return;
+                }
+            }
+
+            if (source === 'board') {
+                if (card.isExhausted || !card.canAttack || (card.attack === 0)) {
+                    gsap.to(`#slot-player-${slotIndex}`, { x: 5, duration: 0.05, yoyo: true, repeat: 3 });
+                    const touch = e.touches[0];
+                    spawnFloatingText(card.attack === 0 ? "Defender" : "Zzz...", touch.clientX, touch.clientY, "text-gray-400");
+                    soundManager.play('click');
+                    return;
+                }
+            }
+
+            const touch = e.touches[0];
+            setDragState({
+                card,
+                source,
+                slotIndex,
+                x: touch.clientX,
+                y: touch.clientY,
+            });
+            soundManager.play('hover');
+        } catch (err) {
+            console.error("Interaction Error:", err);
+            setDragState({ card: null, source: 'hand', x: 0, y: 0 });
+        }
+    };
+
     const handleGlobalMouseMove = (e: MouseEvent) => {
         if (dragState.card) {
             setDragState(prev => ({ ...prev, x: e.clientX, y: e.clientY }));
@@ -376,68 +556,37 @@ export const GameBoard: React.FC<GameBoardProps> = ({ customDeck, difficulty, on
 
     const handleGlobalMouseUp = (e: MouseEvent) => {
         if (!dragState.card) return;
+        attemptDrop(e.clientX, e.clientY);
+    };
 
-        const card = dragState.card;
-        const source = dragState.source;
-
-        try {
-            let targetSlotIndex = -1;
-            let targetOwner: 'player' | 'enemy' | null = null;
-
-            for (let i = 0; i < MAX_BOARD_SLOTS; i++) {
-                const el = document.getElementById(`slot-player-${i}`);
-                if (el) {
-                    const rect = el.getBoundingClientRect();
-                    if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
-                        targetSlotIndex = i;
-                        targetOwner = 'player';
-                        break;
-                    }
-                }
-            }
-
-            if (targetOwner === null) {
-                for (let i = 0; i < MAX_BOARD_SLOTS; i++) {
-                    const el = document.getElementById(`slot-enemy-${i}`);
-                    if (el) {
-                        const rect = el.getBoundingClientRect();
-                        if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
-                            targetSlotIndex = i;
-                            targetOwner = 'enemy';
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (source === 'hand') {
-                const isUnitType = card.type === CardType.UNIT || card.type === CardType.SUMMONER || card.type === CardType.TOKEN || card.type === CardType.MAGE;
-
-                if (isUnitType && targetOwner === 'player' && targetSlotIndex !== -1) {
-                    handleSummonUnit('player', card, targetSlotIndex);
-                } else if (!isUnitType && targetOwner === 'enemy') {
-                    handleCastSpell('player', card, targetSlotIndex);
-                } else if (card.type === CardType.DEFENSE || card.type === CardType.SPELL_HEAL) {
-                    handleCastSpell('player', card);
-                }
-            } else if (source === 'board') {
-                if (targetOwner === 'enemy' && targetSlotIndex !== -1) {
-                    handleUnitCombat('player', dragState.slotIndex!, targetSlotIndex);
-                }
-            }
-        } catch (error) {
-            console.error("Drop Error:", error);
-        } finally {
-            setDragState({ card: null, source: 'hand', x: 0, y: 0 });
+    const handleGlobalTouchMove = (e: TouchEvent) => {
+        if (dragState.card) {
+            e.preventDefault(); // Critical: Prevent scrolling while dragging
+            const touch = e.touches[0];
+            setDragState(prev => ({ ...prev, x: touch.clientX, y: touch.clientY }));
         }
+    };
+
+    const handleGlobalTouchEnd = (e: TouchEvent) => {
+        if (!dragState.card) return;
+        const touch = e.changedTouches[0];
+        attemptDrop(touch.clientX, touch.clientY);
     };
 
     useEffect(() => {
         window.addEventListener('mousemove', handleGlobalMouseMove);
         window.addEventListener('mouseup', handleGlobalMouseUp);
+
+        // Touch Listeners (Passive: false is important for preventing default)
+        window.addEventListener('touchmove', handleGlobalTouchMove, { passive: false });
+        window.addEventListener('touchend', handleGlobalTouchEnd);
+
         return () => {
             window.removeEventListener('mousemove', handleGlobalMouseMove);
             window.removeEventListener('mouseup', handleGlobalMouseUp);
+
+            window.removeEventListener('touchmove', handleGlobalTouchMove);
+            window.removeEventListener('touchend', handleGlobalTouchEnd);
         };
     }, [dragState.card]);
 
@@ -536,7 +685,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ customDeck, difficulty, on
                 value: 2,
                 type: CardType.SPELL_DAMAGE,
                 description: '❄️ Deal 2 damage to an enemy.',
-                image: '/assets/cards/ice_spear.png'
+                image: '/images/ice_spear.png'
             };
 
             if (newHand.length < MAX_HAND_SIZE) {
@@ -952,9 +1101,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({ customDeck, difficulty, on
                 key={`${owner}-${index}`}
                 id={`slot-${owner}-${index}`}
                 className={`
-                relative rounded-lg border-2 flex flex-col items-center justify-center transition-all duration-300
+                relative rounded-xl border-2 flex flex-col items-center justify-center transition-all duration-300
                 ${dropHighlight} ${highlightClass} ${attackHighlight}
                 w-full h-full aspect-[3/4] overflow-hidden group
+                shadow-[0_4px_12px_rgba(0,0,0,0.6),inset_0_1px_2px_rgba(255,255,255,0.05)]
+                backdrop-blur-sm
             `}
             >
                 {card ? (
@@ -962,6 +1113,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({ customDeck, difficulty, on
                         className="w-full h-full"
                         onMouseDown={(e) => {
                             if (owner === 'player') handleMouseDown(e, card, 'board', index);
+                        }}
+                        onTouchStart={(e) => {
+                            if (owner === 'player') handleTouchStart(e, card, 'board', index);
                         }}
                     >
                         <CardComponent
@@ -1005,8 +1159,42 @@ export const GameBoard: React.FC<GameBoardProps> = ({ customDeck, difficulty, on
                 </div>
             )}
 
-            {/* --- BACKGROUND --- */}
-            <div className="game-bg fixed inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black pointer-events-none opacity-0"></div>
+            {/* --- BACKGROUND: TABLETOP BATTLEFIELD --- */}
+            <div className="game-bg fixed inset-0 pointer-events-none opacity-0">
+                {/* Wood Table Base */}
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-950 via-stone-900 to-neutral-950"></div>
+                <div
+                    className="absolute inset-0 opacity-40"
+                    style={{
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' /%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.3'/%3E%3C/svg%3E")`,
+                        backgroundSize: '200px 200px'
+                    }}
+                ></div>
+
+                {/* Leather/Felt Game Mat */}
+                <div className="absolute inset-x-0 top-[10%] bottom-[10%] mx-auto max-w-7xl">
+                    <div className="absolute inset-0 bg-gradient-to-b from-emerald-950/80 via-teal-950/90 to-emerald-950/80 rounded-3xl shadow-[inset_0_0_100px_rgba(0,0,0,0.8),0_20px_60px_rgba(0,0,0,0.9)]"></div>
+                    {/* Felt Texture */}
+                    <div
+                        className="absolute inset-0 rounded-3xl opacity-20"
+                        style={{
+                            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='felt'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='2' numOctaves='3' /%3E%3C/filter%3E%3Crect width='60' height='60' filter='url(%23felt)' opacity='0.5'/%3E%3C/svg%3E")`,
+                            backgroundSize: '60px 60px'
+                        }}
+                    ></div>
+                    {/* Border Stitching Effect */}
+                    <div className="absolute inset-0 rounded-3xl border-4 border-amber-900/40"></div>
+                    <div className="absolute inset-2 rounded-3xl border border-amber-700/20"></div>
+                </div>
+
+                {/* Atmospheric Lighting */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-gradient-radial from-amber-500/10 via-transparent to-transparent blur-3xl"></div>
+                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-gradient-radial from-cyan-500/5 via-transparent to-transparent blur-3xl"></div>
+
+                {/* Vignette */}
+                <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-black/40"></div>
+                <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/30"></div>
+            </div>
 
             {floatingTexts.map(ft => <DamageNumber key={ft.id} value={ft.val} x={ft.x} y={ft.y} color={ft.color} />)}
 
@@ -1128,27 +1316,27 @@ export const GameBoard: React.FC<GameBoardProps> = ({ customDeck, difficulty, on
                 <div className="w-full h-full max-w-7xl mx-auto flex items-end justify-between px-2 md:px-6 pb-2 md:pb-6 relative">
 
                     {/* LEFT: Stats */}
-                    <div className="w-32 md:w-64 bg-slate-900/80 p-2 md:p-3 rounded border border-slate-700 shadow-xl mb-2 backdrop-blur-md">
-                        <div className="flex items-center gap-2 mb-2">
+                    <div className="absolute top-2 left-2 z-30 md:static w-auto md:w-64 bg-slate-900/80 p-2 md:p-3 rounded border border-slate-700 shadow-xl mb-0 md:mb-2 backdrop-blur-md flex flex-row md:flex-col gap-3 md:gap-0 items-center md:items-stretch">
+                        <div className="flex items-center gap-2 mb-0 md:mb-2">
                             <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-[10px] md:text-xs shadow-lg ring-2 ring-blue-400">P1</div>
                             <div className="text-blue-100 font-bold text-xs md:text-sm tracking-widest hidden md:block">COMMANDER</div>
                         </div>
-                        <div className="space-y-1 md:space-y-2">
-                            <StatBar value={gameState.player.board[0]?.health || 0} max={30} color="bg-emerald-500" label="HP" icon="♥" size="sm" />
-                            <StatBar value={gameState.player.mana} max={gameState.player.maxMana} color="bg-indigo-500" label="MANA" icon="⚡" size="sm" />
+                        <div className="flex flex-row md:flex-col gap-2 md:gap-2 w-full">
+                            <div className="w-20 md:w-full"><StatBar value={gameState.player.board[0]?.health || 0} max={30} color="bg-emerald-500" label="HP" icon="♥" size="sm" /></div>
+                            <div className="w-20 md:w-full"><StatBar value={gameState.player.mana} max={gameState.player.maxMana} color="bg-indigo-500" label="MANA" icon="⚡" size="sm" /></div>
                         </div>
-                        {gameState.player.shield > 0 && <div className="text-center text-blue-300 text-[10px] font-bold mt-1 bg-blue-900/30 py-0.5 rounded border border-blue-500/30">SHIELD: {gameState.player.shield}</div>}
+                        {gameState.player.shield > 0 && <div className="hidden md:block text-center text-blue-300 text-[10px] font-bold mt-1 bg-blue-900/30 py-0.5 rounded border border-blue-500/30">SHIELD: {gameState.player.shield}</div>}
                     </div>
 
                     {/* CENTER: Hand */}
-                    <div className="flex-1 h-full flex items-end justify-center pb-2 px-2 md:px-10 pointer-events-none">
-                        <div className="flex items-end justify-center gap-[-10px] md:gap-[-20px] pointer-events-auto" style={{ perspective: '1000px' }}>
+                    <div className="absolute bottom-0 inset-x-0 h-full flex items-end justify-center pb-1 md:pb-2 pointer-events-none md:static md:flex-1 md:px-10">
+                        <div className="flex items-end justify-center pointer-events-auto" style={{ perspective: '1000px' }}>
                             {gameState.player.hand.map((card, i) => (
                                 <div
                                     key={card.id}
                                     className={`transition-all duration-300 card-hand-${card.id} transform hover:-translate-y-16 hover:scale-110 hover:z-50 origin-bottom cursor-pointer`}
                                     style={{
-                                        marginLeft: i === 0 ? 0 : window.innerWidth < 768 ? -30 : -50,
+                                        marginLeft: i === 0 ? 0 : window.innerWidth < 768 ? -40 : -50,
                                         zIndex: i,
                                         transform: `rotate(${(i - gameState.player.hand.length / 2) * 3}deg) translateY(10px)`
                                     }}
@@ -1161,11 +1349,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({ customDeck, difficulty, on
                                         e.currentTarget.style.zIndex = `${i}`;
                                     }}
                                 >
-                                    <div className="scale-75 md:scale-100 origin-bottom">
+                                    <div className="scale-65 md:scale-100 origin-bottom">
                                         <CardComponent
                                             card={card}
                                             index={i}
                                             onMouseDown={(e, c) => handleMouseDown(e, c, 'hand')}
+                                            onTouchStart={(e, c) => handleTouchStart(e, c, 'hand')}
                                             onContextMenu={(e, c) => setDetailCard(c)}
                                             disabled={gameState.phase !== GamePhase.PLAYER_MAIN || card.cost > gameState.player.mana}
                                             isDragging={dragState.card?.id === card.id && dragState.source === 'hand'}
@@ -1177,14 +1366,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({ customDeck, difficulty, on
                     </div>
 
                     {/* RIGHT: Controls */}
-                    <div className="w-24 md:w-48 flex flex-col items-end gap-2 mb-2">
+                    <div className="absolute top-2 right-2 z-30 md:static w-auto md:w-48 flex flex-col items-end gap-2 mb-0 md:mb-2">
                         <button
                             onClick={() => startTurn('enemy')}
                             disabled={gameState.phase !== GamePhase.PLAYER_MAIN}
                             className="
-                        w-full h-12 md:h-16 bg-gradient-to-br from-amber-500 to-yellow-600 
+                        w-auto px-4 md:px-0 md:w-full h-8 md:h-16 bg-gradient-to-br from-amber-500 to-yellow-600 
                         hover:from-amber-400 hover:to-yellow-500 
-                        text-white font-black text-sm md:text-xl rounded shadow-lg border-b-4 border-yellow-800
+                        text-white font-black text-xs md:text-xl rounded shadow-lg border-b-2 md:border-b-4 border-yellow-800
                         active:border-b-0 active:translate-y-1 transition-all
                         disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed
                         flex items-center justify-center gap-2 uppercase tracking-widest
@@ -1193,7 +1382,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ customDeck, difficulty, on
                             <span className="md:hidden">END</span>
                             <span className="hidden md:inline">End Turn</span>
                         </button>
-                        <button onClick={onExit} className="text-slate-500 text-[10px] md:text-xs hover:text-slate-300 transition-colors">SURRENDER</button>
+                        <button onClick={onExit} className="text-slate-500 text-[10px] md:text-xs hover:text-slate-300 transition-colors bg-black/50 px-2 rounded md:bg-transparent md:px-0">SURRENDER</button>
                     </div>
 
                 </div>

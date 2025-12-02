@@ -8,6 +8,7 @@ interface CardProps {
   card: Card | null;
   onClick?: (card: Card) => void;
   onMouseDown?: (e: React.MouseEvent, card: Card) => void;
+  onTouchStart?: (e: React.TouchEvent, card: Card) => void;
   onContextMenu?: (e: React.MouseEvent, card: Card) => void;
   disabled?: boolean;
   isEnemy?: boolean;
@@ -19,7 +20,7 @@ interface CardProps {
   isInspection?: boolean; // NEW: Triggers large, high-detail render
 }
 
-export const CardComponent: React.FC<CardProps> = ({ card, onClick, onMouseDown, onContextMenu, disabled, isEnemy, isRevealed, isDragging, isOnBoard, index, disableInteractive, isInspection }) => {
+export const CardComponent: React.FC<CardProps> = ({ card, onClick, onMouseDown, onTouchStart, onContextMenu, disabled, isEnemy, isRevealed, isDragging, isOnBoard, index, disableInteractive, isInspection }) => {
   const cardRef = useRef<HTMLDivElement>(null);
 
   if (!card) return null;
@@ -159,6 +160,7 @@ export const CardComponent: React.FC<CardProps> = ({ card, onClick, onMouseDown,
       ref={cardRef}
       onClick={handleClick}
       onMouseDown={(e) => !disableInteractive && !disabled && !isInspection && onMouseDown && onMouseDown(e, card)}
+      onTouchStart={(e) => !disableInteractive && !disabled && !isInspection && onTouchStart && onTouchStart(e, card)}
       onContextMenu={handleContextMenu}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}

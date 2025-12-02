@@ -6,8 +6,8 @@ export const INITIAL_HP = 30;
 export const INITIAL_MANA = 1;
 export const MAX_MANA = 10;
 export const MAX_BOARD_SLOTS = 8; // Updated to 8 slots
-export const MIN_DECK_SIZE = 6;
-export const MAX_DECK_SIZE = 10;
+export const MIN_DECK_SIZE = 10;
+export const MAX_DECK_SIZE = 20;
 
 // Slot Configuration Map
 // Layout: 1 Leader, 2 Tanks, 3 Units, 2 Mages
@@ -46,6 +46,7 @@ const CARD_IMAGES = {
   ICE_SPEAR: '/images/ice_spear.png',
   FOOTMAN: '/images/recruit_footman.png',
   SKELETON: '/images/skeleton_warrior.png',
+  FIRE_TANKER: '/images/fireTankerKnight.png',
 };
 
 // Define unique card types/templates available in the game
@@ -160,6 +161,19 @@ export const CARD_TEMPLATES: Card[] = [
     image: CARD_IMAGES.ICE_VANGUARD,
   },
   {
+    id: 't_u_fire_tanker',
+    name: 'Fire Tanker Knight',
+    cost: 6,
+    value: 0,
+    attack: 2,
+    health: 6,
+    maxHealth: 6,
+    type: CardType.UNIT,
+    unitAbility: UnitAbility.AOE_FIRE_DAMAGE_TURN,
+    description: '🔥 Deals 1 DMG to all enemy units each turn.',
+    image: CARD_IMAGES.FIRE_TANKER,
+  },
+  {
     id: 't_s_ice_spear',
     name: 'Ice Spear',
     cost: 0,
@@ -218,8 +232,8 @@ export const CARD_TEMPLATES: Card[] = [
     health: 4,
     maxHealth: 4,
     type: CardType.MAGE,
-    mageEffect: MageEffect.HEAL_FRIENDLY_TANKS,
-    description: 'Passive: Heals Friendly Tanks 1 HP each turn.',
+    mageEffect: MageEffect.HEAL_ALL_FRIENDLY,
+    description: 'Passive: Heals ALL Friendly Units 1 HP each turn.',
     image: CARD_IMAGES.CLERIC,
   },
 

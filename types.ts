@@ -22,6 +22,7 @@ export enum SlotType {
 export enum MageEffect {
   DAMAGE_ENEMY_TANKS = 'DAMAGE_ENEMY_TANKS',
   HEAL_FRIENDLY_TANKS = 'HEAL_FRIENDLY_TANKS',
+  HEAL_ALL_FRIENDLY = 'HEAL_ALL_FRIENDLY',
 }
 
 
@@ -30,6 +31,7 @@ export enum UnitAbility {
   DAMAGE_TO_HEAL = 'DAMAGE_TO_HEAL', // First damage converts to healing (Dark Tanker)
   FREEZE_ON_HIT = 'FREEZE_ON_HIT',   // First attack freezes enemy (Ice Vanguard - Old)
   FREEZE_MAGE_ON_PLAY = 'FREEZE_MAGE_ON_PLAY', // Freeze enemy mage on summon (Ice Vanguard - New)
+  AOE_FIRE_DAMAGE_TURN = 'AOE_FIRE_DAMAGE_TURN', // Deals 1 damage to all enemy units each turn (Fire Tanker Knight)
 }
 
 export interface Card {
